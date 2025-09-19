@@ -11,6 +11,9 @@ public class TodoAppDAO {
 
     private static final String SELECT_ALL_TODOS = "SELECT * FROM todos ORDER BY created_at DESC";
     private static final String INSERT_TODO = "INSERT INTO todos (title,description,completed,created_at,updated_at) VALUES(?,?,?,?,?)";
+    private static final String SELECT_TODO_BY_ID = "SELECT * FROM todos WHERE id=?";
+    private static final String UPDATE_TODO = "UPDATE todos SET title=?,description=?,completed=?,updated_at=? WHERE id=?";
+    private static final String DELETE_TODO = "DELETE FROM todos WHERE id=?";
 
     public int createTodo(Todo todo) throws SQLException {
         try (Connection conn = DatabaseConnection.getDBConnection();
@@ -32,6 +35,46 @@ public class TodoAppDAO {
                     return generatedKeys.getInt(1);
                 } else {
                     throw new SQLException("Creating todo failed, no ID found");
+                }
+            }
+        }
+    }
+    public boolean updateTodo(Todo todo) throws SQLException {
+        
+        try (Connection conn = DatabaseConnection.getDBConnection();
+             PreparedStatement stmt = conn.prepareStatement(UPDATE_TODO)) {
+
+            stmt.setString(1, todo.getTitle());
+            stmt.setString(2, todo.getDescription());
+            stmt.setBoolean(3, todo.isCompleted());
+            stmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setInt(5, todo.getId());
+
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+        }
+    }
+
+    public boolean deleteTodo(int id )throws SQLException{
+        try(Connection conn = DatabaseConnection.getDBConnection();
+            PreparedStatement stmt = conn.prepareStatement(DELETE_TODO))
+            {
+                stmt.setInt(1,id);
+                int rowsAffected = stmt.executeUpdate();
+                return rowsAffected > 0;
+            }
+
+    }
+    public Todo getTodoByID(int id) throws SQLException {
+        try (Connection conn = DatabaseConnection.getDBConnection();
+             PreparedStatement stmt = conn.prepareStatement(SELECT_TODO_BY_ID)) {
+
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return getTodoRow(rs);
+                } else {
+                    return null;
                 }
             }
         }
