@@ -4,6 +4,7 @@ import com.todo.model.Todo;
 import com.todo.dao.TodoAppDAO;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.SQLException;
@@ -27,6 +28,7 @@ public class TodoAppGUI extends JFrame {
         initializeComponents();
         setupLayout();
         setupEventListeners();
+        loadTodos();
     }
 
     private void initializeComponents() {
@@ -44,19 +46,41 @@ public class TodoAppGUI extends JFrame {
 
             @Override
             public Class<?> getColumnClass(int columnIndex) {
-                if (columnIndex == 3) {
-                    return String.class; // ✅ show as plain text
-                }
+                if (columnIndex == 3) return String.class; // show as plain text
                 return super.getColumnClass(columnIndex);
             }
         };
 
         todoTable = new JTable(tableModel);
+        // Table styling
+        todoTable.setBackground(new Color(245, 245, 245)); // White Smoke
+        todoTable.setForeground(Color.DARK_GRAY);
+        todoTable.getTableHeader().setBackground(new Color(220, 220, 220)); // Light Gray header
+        todoTable.getTableHeader().setForeground(Color.BLACK);
+
+        // Table row striping
+        todoTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                                                           boolean isSelected, boolean hasFocus, int row, int col) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col);
+                if (!isSelected) {
+                    if (row % 2 == 0) {
+                        c.setBackground(new Color(255, 255, 255)); // White
+                    } else {
+                        c.setBackground(new Color(240, 248, 255)); // AliceBlue stripe
+                    }
+                } else {
+                    c.setBackground(new Color(173, 216, 230)); // highlight when selected
+                }
+                c.setForeground(Color.DARK_GRAY);
+                return c;
+            }
+        });
+
         todoTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         todoTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                loadSelectedTodo();
-            }
+            if (!e.getValueIsAdjusting()) loadSelectedTodo();
         });
 
         titleField = new JTextField(20);
@@ -66,10 +90,28 @@ public class TodoAppGUI extends JFrame {
 
         completedCheckBox = new JCheckBox("Completed");
 
+        // Buttons
         addButton = new JButton("Add Todo");
         updateButton = new JButton("Update Todo");
         deleteButton = new JButton("Delete Todo");
         refreshButton = new JButton("Refresh Todo");
+
+        Color addUpdateColor = new Color(11, 61, 145); 
+        Color deleteColor = new Color(211, 47, 47);    
+        Color buttonTextAddUpdate = Color.WHITE;
+        Color buttonTextDelete = Color.WHITE;
+
+        addButton.setBackground(addUpdateColor);
+        addButton.setForeground(buttonTextAddUpdate);
+
+        updateButton.setBackground(addUpdateColor);
+        updateButton.setForeground(buttonTextAddUpdate);
+
+        deleteButton.setBackground(deleteColor);
+        deleteButton.setForeground(buttonTextDelete);
+
+        refreshButton.setBackground(addUpdateColor);
+        refreshButton.setForeground(buttonTextAddUpdate);
 
         String[] filterOptions = {"All", "Completed", "Pending"};
         filterComboBox = new JComboBox<>(filterOptions);
@@ -77,7 +119,11 @@ public class TodoAppGUI extends JFrame {
 
     private void setupLayout() {
         setLayout(new BorderLayout());
+
+        // Input panel
         JPanel inputPanel = new JPanel(new GridBagLayout());
+        inputPanel.setBorder(BorderFactory.createTitledBorder("Todo Details"));
+        inputPanel.setBackground(new Color(255, 250, 240)); // Creamy
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -98,32 +144,37 @@ public class TodoAppGUI extends JFrame {
         gbc.gridx = 1;
         inputPanel.add(new JScrollPane(descriptionArea), gbc);
 
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        //inputPanel.add(new JLabel("Completed"), gbc);
-
         gbc.gridx = 1;
-        inputPanel.add(completedCheckBox, gbc); // ✅ now checkbox appears below fields
+        gbc.gridy = 2;
+        inputPanel.add(completedCheckBox, gbc);
 
+        // Button panel
         JPanel buttonPanel = new JPanel(new FlowLayout());
+        buttonPanel.setBackground(new Color(245, 245, 245)); // neutral light
         buttonPanel.add(addButton);
         buttonPanel.add(updateButton);
         buttonPanel.add(deleteButton);
         buttonPanel.add(refreshButton);
 
+        // Filter panel
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setBackground(new Color(255, 250, 240)); // Creamy
         filterPanel.add(new JLabel("Filter:"));
         filterPanel.add(filterComboBox);
 
+        // North panel
         JPanel northPanel = new JPanel(new BorderLayout());
         northPanel.add(filterPanel, BorderLayout.NORTH);
         northPanel.add(inputPanel, BorderLayout.CENTER);
         northPanel.add(buttonPanel, BorderLayout.SOUTH);
-
         add(northPanel, BorderLayout.NORTH);
+
+        // Center (table)
         add(new JScrollPane(todoTable), BorderLayout.CENTER);
 
+        // Status panel
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEADING));
+        statusPanel.setBackground(new Color(245, 245, 245));
         add(statusPanel, BorderLayout.SOUTH);
     }
 
@@ -131,7 +182,8 @@ public class TodoAppGUI extends JFrame {
         addButton.addActionListener(e -> addTodo());
         updateButton.addActionListener(e -> updateTodo());
         deleteButton.addActionListener(e -> deleteTodo());
-        refreshButton.addActionListener(e -> loadTodos());
+        refreshButton.addActionListener(e -> refreshTodo());
+        filterComboBox.addActionListener(e -> filterTodos());
     }
 
     private void addTodo() {
@@ -208,6 +260,10 @@ public class TodoAppGUI extends JFrame {
             try {
                 if (todoDAO.deleteTodo(todoId)) {
                     JOptionPane.showMessageDialog(this, "Todo deleted successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
+                    titleField.setText("");
+                    descriptionArea.setText("");
+                    completedCheckBox.setSelected(false);
+
                     loadTodos();
                 } else {
                     JOptionPane.showMessageDialog(this, "Failed to delete todo", "Error", JOptionPane.ERROR_MESSAGE);
@@ -217,6 +273,32 @@ public class TodoAppGUI extends JFrame {
             }
         }
     }
+
+    private void refreshTodo() {
+        titleField.setText("");
+        descriptionArea.setText("");
+        completedCheckBox.setSelected(false);
+        loadTodos();
+        todoTable.clearSelection();
+    }
+
+    private void filterTodos() {
+        String filter = (String) filterComboBox.getSelectedItem();
+        try {
+            List<Todo> todos;
+            if (filter.equals("Completed")) {
+                todos = todoDAO.filterTodos(true);
+            } else if (filter.equals("Pending")) {
+                todos = todoDAO.filterTodos(false);
+            } else {
+                todos = todoDAO.getAllTodos();
+            }
+            updateTable(todos);
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error filtering todos: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
 
     private void loadTodos() {
         try {
@@ -232,7 +314,7 @@ public class TodoAppGUI extends JFrame {
         if (row >= 0) {
             String title = (String) tableModel.getValueAt(row, 1);
             String description = (String) tableModel.getValueAt(row, 2);
-            boolean completed = Boolean.parseBoolean(String.valueOf(tableModel.getValueAt(row, 3))); // ✅ parse string
+            boolean completed = Boolean.parseBoolean(String.valueOf(tableModel.getValueAt(row, 3)));
 
             titleField.setText(title);
             descriptionArea.setText(description);
@@ -244,12 +326,12 @@ public class TodoAppGUI extends JFrame {
         tableModel.setRowCount(0);
         for (Todo t : todos) {
             Object[] rowData = {
-                t.getId(),
-                t.getTitle(),
-                t.getDescription(),
-                String.valueOf(t.isCompleted()), // ✅ store as string
-                t.getCreated_at(),
-                t.getUpdated_at()
+                    t.getId(),
+                    t.getTitle(),
+                    t.getDescription(),
+                    String.valueOf(t.isCompleted()),
+                    t.getCreated_at(),
+                    t.getUpdated_at()
             };
             tableModel.addRow(rowData);
         }
